@@ -72,6 +72,7 @@ let robberContext = null;
 let robberVictimContext = null;
 let discardContext = null;
 let monopolyContext = null;
+let yearOfPlentyContext = null;
 
 const els = {
   board: document.getElementById("board"),
@@ -86,6 +87,9 @@ const els = {
   closeDevHelpBtn: document.getElementById("closeDevHelpBtn"),
   monopolyModal: document.getElementById("monopolyModal"),
   monopolyChoices: document.getElementById("monopolyChoices"),
+  yearOfPlentyModal: document.getElementById("yearOfPlentyModal"),
+  yearOfPlentyChoices: document.getElementById("yearOfPlentyChoices"),
+  yearOfPlentyStatus: document.getElementById("yearOfPlentyStatus"),
   robberVictimModal: document.getElementById("robberVictimModal"),
   robberVictimChoices: document.getElementById("robberVictimChoices"),
   discardModal: document.getElementById("discardModal"),
@@ -373,7 +377,15 @@ function openMonopolyModal(playerId) {
 
 function resolveMonopoly(resource) {
   if (!monopolyContext) return;
-  const player = getPlayer(monopolyContext.playerId);
+  resolveMonopolyForPlayer(monopolyContext.playerId, resource);
+  monopolyContext = null;
+  els.monopolyModal.hidden = true;
+  checkWin();
+  render();
+}
+
+function resolveMonopolyForPlayer(playerId, resource) {
+  const player = getPlayer(playerId);
   let gained = 0;
   state.players.forEach((p) => {
     if (p.id === player.id) return;
@@ -381,9 +393,74 @@ function resolveMonopoly(resource) {
     player.resources[resource] += p.resources[resource];
     p.resources[resource] = 0;
   });
-  log(`독점 카드로 ${RESOURCE_LABEL[resource]} ${gained}장을 가져왔습니다.`);
-  monopolyContext = null;
-  els.monopolyModal.hidden = true;
+  log(`${player.name}이 독점 카드로 ${RESOURCE_LABEL[resource]} ${gained}장을 가져왔습니다.`);
+}
+
+function openYearOfPlentyModal(playerId) {
+  const available = RESOURCES.reduce((sum, res) => sum + state.bank[res], 0);
+  if (available <= 0) {
+    log("풍년 카드로 가져올 수 있는 자원이 은행에 없습니다.");
+    checkWin();
+    render();
+    return;
+  }
+  yearOfPlentyContext = {
+    playerId,
+    selected: [],
+    target: Math.min(2, available),
+  };
+  els.yearOfPlentyModal.hidden = false;
+  renderYearOfPlentyModal();
+}
+
+function renderYearOfPlentyModal() {
+  if (!yearOfPlentyContext) return;
+  const remaining = yearOfPlentyContext.target - yearOfPlentyContext.selected.length;
+  const selectedText = yearOfPlentyContext.selected.length
+    ? `선택: ${yearOfPlentyContext.selected.map((res) => resourceText(res, "compact")).join(", ")}`
+    : "아직 선택한 자원이 없습니다.";
+  els.yearOfPlentyStatus.textContent = `${selectedText} · ${remaining}장 더 선택`;
+  const selectedCounts = yearOfPlentyContext.selected.reduce((counts, res) => {
+    counts[res] = (counts[res] || 0) + 1;
+    return counts;
+  }, {});
+  els.yearOfPlentyChoices.innerHTML = RESOURCES.map((res) => {
+    const available = state.bank[res] - (selectedCounts[res] || 0);
+    return `
+      <button data-year-resource="${res}" ${available <= 0 ? "disabled" : ""}>
+        ${resourceText(res, "compact")}
+        <span>남은 카드 ${Math.max(0, available)}장</span>
+      </button>
+    `;
+  }).join("");
+  els.yearOfPlentyChoices.querySelectorAll("[data-year-resource]").forEach((btn) => {
+    btn.addEventListener("click", () => chooseYearOfPlentyResource(btn.dataset.yearResource));
+  });
+}
+
+function chooseYearOfPlentyResource(resource) {
+  if (!yearOfPlentyContext || yearOfPlentyContext.selected.length >= yearOfPlentyContext.target) return;
+  const alreadySelected = yearOfPlentyContext.selected.filter((res) => res === resource).length;
+  if (state.bank[resource] - alreadySelected <= 0) return;
+  yearOfPlentyContext.selected.push(resource);
+  if (yearOfPlentyContext.selected.length >= yearOfPlentyContext.target) {
+    resolveYearOfPlenty();
+    return;
+  }
+  renderYearOfPlentyModal();
+}
+
+function resolveYearOfPlenty() {
+  if (!yearOfPlentyContext) return;
+  const playerId = yearOfPlentyContext.playerId;
+  const gained = emptyResources();
+  yearOfPlentyContext.selected.forEach((res) => {
+    gained[res] += gainResource(playerId, res, 1);
+  });
+  const gainedText = formatResourceGain(gained) || "없음";
+  log(`${getPlayer(playerId).name}이 풍년 카드로 ${gainedText}을 얻었습니다.`);
+  yearOfPlentyContext = null;
+  els.yearOfPlentyModal.hidden = true;
   checkWin();
   render();
 }
@@ -474,6 +551,7 @@ function newGame() {
   robberVictimContext = null;
   discardContext = null;
   monopolyContext = null;
+  yearOfPlentyContext = null;
   log("선 결정 주사위를 굴립니다. 각 참가자가 차례대로 굴립니다.");
   closeNewGameModal();
   render();
@@ -1129,13 +1207,60 @@ function roadExpansionScore(playerId, edgeId) {
 
 function npcUseDevCard(playerId) {
   const player = getPlayer(playerId);
+  if (state.devPlayedThisTurn) return;
   const knightIndex = player.devCards.findIndex((c) => c.type === "knight" && c.turnBought !== state.turnCounter);
   if (knightIndex >= 0 && (player.difficulty === "hard" || Math.random() > 0.45)) {
     player.devCards.splice(knightIndex, 1);
     player.playedKnights += 1;
     moveRobber(playerId);
     updateLargestArmy();
+    state.devPlayedThisTurn = true;
+    return;
   }
+  const yearIndex = player.devCards.findIndex((c) => c.type === "yearOfPlenty" && c.turnBought !== state.turnCounter);
+  if (yearIndex >= 0 && RESOURCES.some((res) => state.bank[res] > 0)) {
+    player.devCards.splice(yearIndex, 1);
+    const gained = chooseNpcYearOfPlentyResources(playerId);
+    state.devPlayedThisTurn = true;
+    log(`${player.name}이 풍년 카드로 ${formatResourceGain(gained)}을 얻었습니다.`);
+    return;
+  }
+  const monopolyIndex = player.devCards.findIndex((c) => c.type === "monopoly" && c.turnBought !== state.turnCounter);
+  const monopolyChoice = chooseNpcMonopolyResource(playerId);
+  if (monopolyIndex >= 0 && monopolyChoice) {
+    player.devCards.splice(monopolyIndex, 1);
+    resolveMonopolyForPlayer(playerId, monopolyChoice);
+    state.devPlayedThisTurn = true;
+  }
+}
+
+function chooseNpcYearOfPlentyResources(playerId) {
+  const gained = emptyResources();
+  for (let i = 0; i < 2; i += 1) {
+    const candidates = RESOURCES
+      .filter((res) => state.bank[res] > 0)
+      .map((res) => ({ res, score: resourceNeedScore(playerId, res) + Math.random() * 0.25 }))
+      .sort((a, b) => b.score - a.score);
+    const choice = candidates[0]?.res;
+    if (!choice) break;
+    gained[choice] += gainResource(playerId, choice, 1);
+  }
+  return gained;
+}
+
+function chooseNpcMonopolyResource(playerId) {
+  const choices = RESOURCES.map((res) => {
+    const opponentTotal = state.players
+      .filter((player) => player.id !== playerId)
+      .reduce((sum, player) => sum + player.resources[res], 0);
+    return {
+      res,
+      score: opponentTotal + resourceNeedScore(playerId, res) * 0.18,
+      opponentTotal,
+    };
+  }).filter((choice) => choice.opponentTotal > 0);
+  choices.sort((a, b) => b.score - a.score || b.opponentTotal - a.opponentTotal);
+  return choices[0]?.res || null;
 }
 
 function buyDevelopmentCard(playerId = state.currentPlayer) {
@@ -1937,9 +2062,9 @@ function playHumanDev(type) {
     selectedBuild = "road";
     log("도로 건설 카드로 무료 도로 2개를 배치합니다.");
   } else if (type === "yearOfPlenty") {
-    gainResource(0, "wheat", 1);
-    gainResource(0, "ore", 1);
-    log("풍년 카드로 밀과 광석을 얻었습니다.");
+    openYearOfPlentyModal(0);
+    render();
+    return;
   } else if (type === "monopoly") {
     openMonopolyModal(0);
     render();

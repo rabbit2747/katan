@@ -464,16 +464,25 @@ select {
   line-height: 1.45;
 }
 
-.monopoly-grid {
+.monopoly-grid,
+.resource-choice-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
   margin-top: 14px;
 }
 
-.monopoly-grid button {
+.monopoly-grid button,
+.resource-choice-grid button {
   min-height: 54px;
   font-weight: 900;
+}
+
+.resource-choice-grid button span {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .victim-grid {

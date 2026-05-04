@@ -196,7 +196,7 @@
           </article>
           <article>
             <strong>풍년</strong>
-            <p>원하는 자원 2장을 가져옵니다. 현재 구현에서는 밀 1장과 광석 1장을 받습니다.</p>
+            <p>원하는 자원 2장을 선택해서 가져옵니다. 같은 자원도 두 번 선택할 수 있습니다.</p>
           </article>
           <article>
             <strong>독점</strong>
@@ -213,6 +213,18 @@
         </div>
         <p class="modal-subtitle">가져올 자원 한 종류를 선택하세요.</p>
         <div class="monopoly-grid" id="monopolyChoices"></div>
+      </section>
+    </div>
+
+    <div class="modal-backdrop" id="yearOfPlentyModal" hidden>
+      <section class="modal" role="dialog" aria-modal="true" aria-labelledby="yearOfPlentyTitle">
+        <div class="modal-head">
+          <div>
+            <h2 id="yearOfPlentyTitle">풍년 자원 선택</h2>
+            <p id="yearOfPlentyStatus" class="modal-subtitle">가져올 자원 2장을 선택하세요.</p>
+          </div>
+        </div>
+        <div class="resource-choice-grid" id="yearOfPlentyChoices"></div>
       </section>
     </div>
 
