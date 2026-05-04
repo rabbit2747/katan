@@ -1394,7 +1394,7 @@ function openPlayerTradeModal() {
     .join("");
   els.tradeOpponentSelect.value = state.players[Number(opponentValue)]?.isHuman ? "1" : opponentValue;
   fillResourceSelect(els.tradeGiveResource, els.tradeGiveResource.value || richestResource(state.players[0]) || "wood");
-  fillResourceSelect(els.tradeTakeResource, els.tradeTakeResource.value || richestResource(getPlayer(Number(els.tradeOpponentSelect.value))) || "brick");
+  fillResourceSelect(els.tradeTakeResource, els.tradeTakeResource.value || "brick");
   els.tradeGiveAmount.value = Math.max(1, Number(els.tradeGiveAmount.value || 1));
   els.tradeTakeAmount.value = Math.max(1, Number(els.tradeTakeAmount.value || 1));
   els.playerTradeStatus.textContent = "";
@@ -1432,8 +1432,12 @@ function validatePlayerTradeOffer(offer = readPlayerTradeOffer()) {
   if (!opponent || opponent.isHuman) return "교환할 상대를 선택하세요.";
   if (offer.giveResource === offer.takeResource) return "같은 자원끼리는 교환할 필요가 없습니다.";
   if (human.resources[offer.giveResource] < offer.giveAmount) return `내 ${resourceText(offer.giveResource, "name")}가 부족합니다.`;
-  if (opponent.resources[offer.takeResource] < offer.takeAmount) return `${opponent.name}의 ${resourceText(offer.takeResource, "name")}가 부족합니다.`;
   return "";
+}
+
+function canOpponentPayTradeOffer(offer) {
+  const opponent = state.players[offer.opponentId];
+  return Boolean(opponent && !opponent.isHuman && opponent.resources[offer.takeResource] >= offer.takeAmount);
 }
 
 function updatePlayerTradeModal() {
@@ -1444,7 +1448,7 @@ function updatePlayerTradeModal() {
   const human = state.players[0];
   const opponent = state.players[offer.opponentId];
   els.tradeGiveAmount.max = Math.max(1, human.resources[offer.giveResource] || 0);
-  els.tradeTakeAmount.max = Math.max(1, opponent?.resources[offer.takeResource] || 0);
+  els.tradeTakeAmount.max = RESOURCE_BANK_SIZE;
   const error = validatePlayerTradeOffer(offer);
   els.submitPlayerTradeBtn.disabled = Boolean(error);
   els.playerTradeStatus.textContent = error || `${opponent.name}에게 제안할 수 있습니다.`;
@@ -1468,7 +1472,7 @@ function submitPlayerTradeOffer() {
       els.submitPlayerTradeBtn.disabled = true;
       return;
     }
-    if (evaluateNpcTrade(0, offer.opponentId, offer)) {
+    if (canOpponentPayTradeOffer(offer) && evaluateNpcTrade(0, offer.opponentId, offer)) {
       applyPlayerTrade(0, offer.opponentId, offer);
       els.playerTradeStatus.textContent = `${opponent.name}가 교환을 수락했습니다.`;
       closePlayerTradeModal();
