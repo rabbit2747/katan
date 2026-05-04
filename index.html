@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Katan Solo</title>
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="styles.css?v=layout-swap-2" />
   </head>
   <body>
     <div id="app">
@@ -56,13 +56,6 @@
           <p id="tradeRate">기본 4:1</p>
         </section>
 
-        <section class="panel dev-panel">
-          <div class="panel-title-row">
-            <h2>발전 카드</h2>
-            <button id="devHelpBtn" class="mini-help-btn" aria-label="발전 카드 설명">?</button>
-          </div>
-          <div id="devCards"></div>
-        </section>
       </aside>
 
       <main class="game-shell">
@@ -92,6 +85,13 @@
             <div id="bankResourceBar" class="bank-resource-bar"></div>
           </div>
         </section>
+        <section class="panel dev-panel">
+          <div class="panel-title-row">
+            <h2>발전 카드</h2>
+            <button id="devHelpBtn" class="mini-help-btn" aria-label="발전 카드 설명">?</button>
+          </div>
+          <div id="devCards"></div>
+        </section>
         <section class="panel log-panel">
           <h2>게임 로그</h2>
           <div id="log"></div>
@@ -107,19 +107,23 @@
         </div>
         <div class="color-options">
           <label>
-            나
+            참가자 1
+            <input type="text" id="playerName0" value="나" maxlength="12" />
             <input type="color" id="playerColor0" value="#2563a5" />
           </label>
           <label>
-            NPC A
+            참가자 2
+            <input type="text" id="playerName1" value="NPC A" maxlength="12" />
             <input type="color" id="playerColor1" value="#b94235" />
           </label>
           <label>
-            NPC B
+            참가자 3
+            <input type="text" id="playerName2" value="NPC B" maxlength="12" />
             <input type="color" id="playerColor2" value="#d97706" />
           </label>
           <label>
-            NPC C
+            참가자 4
+            <input type="text" id="playerName3" value="NPC C" maxlength="12" />
             <input type="color" id="playerColor3" value="#8e5bb8" />
           </label>
         </div>

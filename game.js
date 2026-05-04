@@ -31,6 +31,7 @@ const COSTS = {
   dev: { sheep: 1, wheat: 1, ore: 1 },
 };
 const PLAYER_COLORS = ["#2563a5", "#b94235", "#d97706", "#8e5bb8"];
+const DEFAULT_PLAYER_NAMES = ["나", "NPC A", "NPC B", "NPC C"];
 const DEV_DECK_TEMPLATE = [
   ...Array(14).fill("knight"),
   ...Array(5).fill("victory"),
@@ -101,6 +102,7 @@ const els = {
   newGameBtn: document.getElementById("newGameBtn"),
   difficultySelect: document.getElementById("difficultySelect"),
   targetScoreInput: document.getElementById("targetScoreInput"),
+  playerNameInputs: Array.from({ length: 4 }, (_, i) => document.getElementById(`playerName${i}`)),
   playerColorInputs: Array.from({ length: 4 }, (_, i) => document.getElementById(`playerColor${i}`)),
   npcTurnDelay: document.getElementById("npcTurnDelay"),
   npcTurnDelayValue: document.getElementById("npcTurnDelayValue"),
@@ -289,7 +291,8 @@ function findCoastalPortPair(coastal, start, used) {
 
 function createPlayers(difficulty) {
   const colors = getConfiguredPlayerColors();
-  return ["나", "NPC A", "NPC B", "NPC C"].map((name, i) => ({
+  const names = getConfiguredPlayerNames();
+  return names.map((name, i) => ({
     id: i,
     name,
     color: colors[i],
@@ -308,6 +311,13 @@ function createPlayers(difficulty) {
 
 function getConfiguredPlayerColors() {
   return els.playerColorInputs.map((input, index) => input?.value || PLAYER_COLORS[index]);
+}
+
+function getConfiguredPlayerNames() {
+  return els.playerNameInputs.map((input, index) => {
+    const name = input?.value?.trim();
+    return name || DEFAULT_PLAYER_NAMES[index];
+  });
 }
 
 function getNpcTurnDelay() {
@@ -334,6 +344,18 @@ function applyPlayerColorSettings() {
   if (!state) return;
   getConfiguredPlayerColors().forEach((color, index) => {
     state.players[index].color = color;
+  });
+  render();
+}
+
+function applyPlayerNameSettings() {
+  const names = getConfiguredPlayerNames();
+  els.playerNameInputs.forEach((input, index) => {
+    if (input && !input.value.trim()) input.value = DEFAULT_PLAYER_NAMES[index];
+  });
+  if (!state) return;
+  names.forEach((name, index) => {
+    state.players[index].name = name;
   });
   render();
 }
@@ -2195,6 +2217,10 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && !els.playerTradeModal.hidden) closePlayerTradeModal();
 });
 els.confirmDiscardBtn.addEventListener("click", confirmDiscard);
+els.playerNameInputs.forEach((input) => {
+  input.addEventListener("change", applyPlayerNameSettings);
+  input.addEventListener("input", applyPlayerNameSettings);
+});
 els.playerColorInputs.forEach((input) => {
   input.addEventListener("input", applyPlayerColorSettings);
 });

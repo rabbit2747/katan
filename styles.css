@@ -93,10 +93,25 @@ select {
 
 #app {
   display: grid;
-  grid-template-columns: 290px minmax(520px, 1fr) 310px;
+  grid-template-columns: minmax(230px, 310px) minmax(420px, 1fr) minmax(230px, 290px);
   gap: 14px;
   min-height: 100vh;
   padding: 14px;
+}
+
+.logbar {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.game-shell {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.sidebar {
+  grid-column: 3;
+  grid-row: 1;
 }
 
 .sidebar,
@@ -235,6 +250,18 @@ select {
   background: #fffaf0;
   padding: 4px;
   cursor: pointer;
+}
+
+.color-options input[type="text"] {
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid #b9ae98;
+  border-radius: 6px;
+  background: #fffaf0;
+  color: var(--ink);
+  padding: 0 9px;
+  font: inherit;
+  font-weight: 800;
 }
 
 .speed-option {
@@ -1129,20 +1156,45 @@ select {
 
 @media (max-width: 1120px) {
   #app {
-    grid-template-columns: 260px 1fr;
+    grid-template-columns: minmax(210px, 250px) minmax(360px, 1fr) minmax(210px, 250px);
+  }
+
+  .game-shell {
+    grid-column: 2;
+  }
+
+  .sidebar {
+    grid-column: 3;
   }
 
   .logbar {
-    grid-column: 1 / -1;
-    display: grid;
-    grid-template-columns: 1fr 1fr 2fr;
+    grid-column: 1;
   }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 900px) {
   #app,
   .logbar {
     grid-template-columns: 1fr;
+  }
+
+  .sidebar,
+  .game-shell,
+  .logbar {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .logbar {
+    order: 1;
+  }
+
+  .game-shell {
+    order: 2;
+  }
+
+  .sidebar {
+    order: 3;
   }
 
   .scoreboard {
