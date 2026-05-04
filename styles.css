@@ -380,6 +380,55 @@ select {
   font-weight: 800;
 }
 
+.trade-responses {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.trade-response {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 9px;
+  border: 1px solid var(--line);
+  border-left: 7px solid var(--player-color);
+  border-radius: 8px;
+  background: #fffaf0;
+}
+
+.trade-response.reject {
+  opacity: 0.64;
+}
+
+.trade-response.counter {
+  border-color: var(--gold);
+  background: #fff3bd;
+}
+
+.trade-response strong,
+.trade-response span {
+  display: block;
+}
+
+.trade-response strong {
+  font-size: 13px;
+}
+
+.trade-response span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.trade-response button {
+  min-height: 32px;
+  padding: 0 12px;
+  font-weight: 900;
+}
+
 .modal-start-btn {
   width: 100%;
   margin-top: 14px;

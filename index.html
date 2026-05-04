@@ -245,14 +245,10 @@
         <div class="modal-head">
           <div>
             <h2 id="playerTradeTitle">플레이어 교환</h2>
-            <p class="modal-subtitle">상대에게 교환을 제안하고 수락 여부를 기다립니다.</p>
+            <p class="modal-subtitle">NPC 3명에게 동시에 제안하고 응답을 기다립니다.</p>
           </div>
           <button id="closePlayerTradeBtn" class="icon-btn dark" aria-label="닫기">×</button>
         </div>
-        <label class="modal-field">
-          상대 플레이어
-          <select id="tradeOpponentSelect"></select>
-        </label>
         <div class="player-trade-grid">
           <div class="trade-card">
             <strong>내가 줌</strong>
@@ -270,6 +266,7 @@
           </div>
         </div>
         <p id="playerTradeStatus" class="trade-status"></p>
+        <div id="tradeResponses" class="trade-responses"></div>
         <button id="submitPlayerTradeBtn" class="primary modal-start-btn">제안 보내기</button>
       </section>
     </div>

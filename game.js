@@ -73,6 +73,7 @@ let robberVictimContext = null;
 let discardContext = null;
 let monopolyContext = null;
 let yearOfPlentyContext = null;
+let playerTradeContext = null;
 
 const els = {
   board: document.getElementById("board"),
@@ -124,12 +125,12 @@ const els = {
   playerTradeBtn: document.getElementById("playerTradeBtn"),
   playerTradeModal: document.getElementById("playerTradeModal"),
   closePlayerTradeBtn: document.getElementById("closePlayerTradeBtn"),
-  tradeOpponentSelect: document.getElementById("tradeOpponentSelect"),
   tradeGiveResource: document.getElementById("tradeGiveResource"),
   tradeGiveAmount: document.getElementById("tradeGiveAmount"),
   tradeTakeResource: document.getElementById("tradeTakeResource"),
   tradeTakeAmount: document.getElementById("tradeTakeAmount"),
   playerTradeStatus: document.getElementById("playerTradeStatus"),
+  tradeResponses: document.getElementById("tradeResponses"),
   submitPlayerTradeBtn: document.getElementById("submitPlayerTradeBtn"),
   tradeRate: document.getElementById("tradeRate"),
   devCards: document.getElementById("devCards"),
@@ -552,6 +553,7 @@ function newGame() {
   discardContext = null;
   monopolyContext = null;
   yearOfPlentyContext = null;
+  playerTradeContext = null;
   log("선 결정 주사위를 굴립니다. 각 참가자가 차례대로 굴립니다.");
   closeNewGameModal();
   render();
@@ -1387,23 +1389,20 @@ function performBankTrade() {
 
 function openPlayerTradeModal() {
   if (!state || state.gameOver || state.currentPlayer !== 0 || state.phase !== "build") return;
-  const opponentValue = els.tradeOpponentSelect.value || "1";
-  els.tradeOpponentSelect.innerHTML = state.players
-    .filter((player) => !player.isHuman)
-    .map((player) => `<option value="${player.id}">${escapeHtml(player.name)} · 자원 ${resourceCount(player)}장</option>`)
-    .join("");
-  els.tradeOpponentSelect.value = state.players[Number(opponentValue)]?.isHuman ? "1" : opponentValue;
+  playerTradeContext = null;
   fillResourceSelect(els.tradeGiveResource, els.tradeGiveResource.value || richestResource(state.players[0]) || "wood");
   fillResourceSelect(els.tradeTakeResource, els.tradeTakeResource.value || "brick");
   els.tradeGiveAmount.value = Math.max(1, Number(els.tradeGiveAmount.value || 1));
   els.tradeTakeAmount.value = Math.max(1, Number(els.tradeTakeAmount.value || 1));
   els.playerTradeStatus.textContent = "";
+  els.tradeResponses.innerHTML = "";
   els.playerTradeModal.hidden = false;
   updatePlayerTradeModal();
 }
 
 function closePlayerTradeModal() {
   els.playerTradeModal.hidden = true;
+  playerTradeContext = null;
 }
 
 function fillResourceSelect(select, value) {
@@ -1417,7 +1416,6 @@ function richestResource(player) {
 
 function readPlayerTradeOffer() {
   return {
-    opponentId: Number(els.tradeOpponentSelect.value),
     giveResource: els.tradeGiveResource.value,
     giveAmount: Math.max(1, Number(els.tradeGiveAmount.value || 1)),
     takeResource: els.tradeTakeResource.value,
@@ -1428,8 +1426,6 @@ function readPlayerTradeOffer() {
 function validatePlayerTradeOffer(offer = readPlayerTradeOffer()) {
   if (!state || state.gameOver || state.currentPlayer !== 0 || state.phase !== "build") return "내 차례의 건설 단계에서만 교환할 수 있습니다.";
   const human = state.players[0];
-  const opponent = state.players[offer.opponentId];
-  if (!opponent || opponent.isHuman) return "교환할 상대를 선택하세요.";
   if (offer.giveResource === offer.takeResource) return "같은 자원끼리는 교환할 필요가 없습니다.";
   if (human.resources[offer.giveResource] < offer.giveAmount) return `내 ${resourceText(offer.giveResource, "name")}가 부족합니다.`;
   return "";
@@ -1446,12 +1442,22 @@ function updatePlayerTradeModal() {
   fillResourceSelect(els.tradeTakeResource, els.tradeTakeResource.value || "brick");
   const offer = readPlayerTradeOffer();
   const human = state.players[0];
-  const opponent = state.players[offer.opponentId];
   els.tradeGiveAmount.max = Math.max(1, human.resources[offer.giveResource] || 0);
   els.tradeTakeAmount.max = RESOURCE_BANK_SIZE;
   const error = validatePlayerTradeOffer(offer);
   els.submitPlayerTradeBtn.disabled = Boolean(error);
-  els.playerTradeStatus.textContent = error || `${opponent.name}에게 제안할 수 있습니다.`;
+  if (error) {
+    els.playerTradeStatus.textContent = error;
+    els.tradeResponses.innerHTML = "";
+  } else if (!playerTradeContext) {
+    els.playerTradeStatus.textContent = "NPC 3명 모두에게 제안할 수 있습니다.";
+  }
+}
+
+function handlePlayerTradeInputChange() {
+  playerTradeContext = null;
+  els.tradeResponses.innerHTML = "";
+  updatePlayerTradeModal();
 }
 
 function submitPlayerTradeOffer() {
@@ -1461,9 +1467,9 @@ function submitPlayerTradeOffer() {
     els.playerTradeStatus.textContent = error;
     return;
   }
-  const opponent = getPlayer(offer.opponentId);
   els.submitPlayerTradeBtn.disabled = true;
-  els.playerTradeStatus.textContent = `${opponent.name}가 제안을 검토하고 있습니다...`;
+  els.tradeResponses.innerHTML = "";
+  els.playerTradeStatus.textContent = "NPC들이 제안을 검토하고 있습니다...";
   setTimeout(() => {
     if (!state || state.gameOver || state.currentPlayer !== 0 || state.phase !== "build") return;
     const currentError = validatePlayerTradeOffer(offer);
@@ -1472,16 +1478,87 @@ function submitPlayerTradeOffer() {
       els.submitPlayerTradeBtn.disabled = true;
       return;
     }
-    if (canOpponentPayTradeOffer(offer) && evaluateNpcTrade(0, offer.opponentId, offer)) {
-      applyPlayerTrade(0, offer.opponentId, offer);
-      els.playerTradeStatus.textContent = `${opponent.name}가 교환을 수락했습니다.`;
-      closePlayerTradeModal();
-      render();
-    } else {
-      els.playerTradeStatus.textContent = `${opponent.name}가 교환을 거절했습니다.`;
-      els.submitPlayerTradeBtn.disabled = false;
-    }
+    const responses = state.players
+      .filter((player) => !player.isHuman)
+      .map((player) => buildNpcTradeResponse(player.id, offer));
+    playerTradeContext = { offer, responses };
+    renderPlayerTradeResponses();
+    els.submitPlayerTradeBtn.disabled = false;
   }, Math.max(700, Math.min(1800, getNpcTurnDelay())));
+}
+
+function buildNpcTradeResponse(npcId, offer) {
+  const baseOffer = { ...offer, opponentId: npcId };
+  const npc = getPlayer(npcId);
+  if (!canOpponentPayTradeOffer(baseOffer)) {
+    return { npcId, type: "reject", offer: baseOffer };
+  }
+  const needScore = resourceNeedScore(npcId, offer.giveResource);
+  const maxTakeAmount = npc.resources[offer.takeResource];
+  const canSweeten = needScore >= 4 && maxTakeAmount > offer.takeAmount;
+  if (canSweeten) {
+    const extra = Math.min(maxTakeAmount - offer.takeAmount, needScore >= 5.6 ? 2 : 1);
+    return {
+      npcId,
+      type: "counter",
+      offer: { ...baseOffer, takeAmount: offer.takeAmount + extra },
+    };
+  }
+  if (evaluateNpcTrade(0, npcId, baseOffer)) {
+    return { npcId, type: "accept", offer: baseOffer };
+  }
+  return { npcId, type: "reject", offer: baseOffer };
+}
+
+function renderPlayerTradeResponses() {
+  if (!playerTradeContext) return;
+  const offers = playerTradeContext.responses.filter((response) => response.type !== "reject");
+  els.playerTradeStatus.textContent = offers.length
+    ? `${offers.length}명이 수락 또는 상향 제안을 했습니다. 교환할 상대를 선택하세요.`
+    : "모든 NPC가 교환을 거절했습니다.";
+  els.tradeResponses.innerHTML = playerTradeContext.responses.map((response, index) => {
+    const player = getPlayer(response.npcId);
+    const label = response.type === "counter" ? "상향 제안" : response.type === "accept" ? "수락" : "거절";
+    const detail = response.type === "reject"
+      ? "이번 제안을 받아들이지 않았습니다."
+      : tradeOfferText(response.offer);
+    return `
+      <div class="trade-response ${response.type}" style="--player-color:${player.color}">
+        <div>
+          <strong>${escapeHtml(player.name)} · ${label}</strong>
+          <span>${detail}</span>
+        </div>
+        ${response.type !== "reject" ? `<button data-trade-response="${index}">선택</button>` : ""}
+      </div>
+    `;
+  }).join("");
+  els.tradeResponses.querySelectorAll("[data-trade-response]").forEach((btn) => {
+    btn.addEventListener("click", () => selectPlayerTradeResponse(Number(btn.dataset.tradeResponse)));
+  });
+}
+
+function tradeOfferText(offer) {
+  return `내가 ${resourceText(offer.giveResource, "name")} ${offer.giveAmount}장 주고 ${resourceText(offer.takeResource, "name")} ${offer.takeAmount}장 받음`;
+}
+
+function selectPlayerTradeResponse(index) {
+  if (!playerTradeContext) return;
+  const response = playerTradeContext.responses[index];
+  if (!response || response.type === "reject") return;
+  const error = validatePlayerTradeOffer(response.offer);
+  if (error) {
+    els.playerTradeStatus.textContent = error;
+    return;
+  }
+  if (!canOpponentPayTradeOffer(response.offer)) {
+    els.playerTradeStatus.textContent = `${getPlayer(response.npcId).name}가 교환을 철회했습니다.`;
+    response.type = "reject";
+    renderPlayerTradeResponses();
+    return;
+  }
+  applyPlayerTrade(0, response.npcId, response.offer);
+  closePlayerTradeModal();
+  render();
 }
 
 function evaluateNpcTrade(humanId, npcId, offer) {
@@ -2136,10 +2213,10 @@ els.closePlayerTradeBtn.addEventListener("click", closePlayerTradeModal);
 els.playerTradeModal.addEventListener("click", (event) => {
   if (event.target === els.playerTradeModal) closePlayerTradeModal();
 });
-[els.tradeOpponentSelect, els.tradeGiveResource, els.tradeGiveAmount, els.tradeTakeResource, els.tradeTakeAmount]
-  .forEach((input) => input.addEventListener("input", updatePlayerTradeModal));
-[els.tradeOpponentSelect, els.tradeGiveResource, els.tradeTakeResource]
-  .forEach((input) => input.addEventListener("change", updatePlayerTradeModal));
+[els.tradeGiveResource, els.tradeGiveAmount, els.tradeTakeResource, els.tradeTakeAmount]
+  .forEach((input) => input.addEventListener("input", handlePlayerTradeInputChange));
+[els.tradeGiveResource, els.tradeTakeResource]
+  .forEach((input) => input.addEventListener("change", handlePlayerTradeInputChange));
 els.submitPlayerTradeBtn.addEventListener("click", submitPlayerTradeOffer);
 document.querySelectorAll("[data-build]").forEach((btn) => {
   btn.addEventListener("click", () => humanBuild(btn.dataset.build));
