@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Katan Solo</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <aside class="sidebar">
+        <div class="brand">
+          <span class="mark"></span>
+          <div>
+            <h1>Katan Solo</h1>
+            <p>Human vs 3 NPC</p>
+          </div>
+          <button id="playBtn" class="icon-btn play" aria-label="새 게임">▶</button>
+          <button id="optionsBtn" class="icon-btn" aria-label="옵션">⚙</button>
+        </div>
+
+        <section class="panel current-panel">
+          <div class="turn-topline">
+            <span id="turnPlayer">대기 중</span>
+            <span id="turnPhase">설정</span>
+          </div>
+          <div class="turn-track" id="turnTrack"></div>
+          <div class="dice-grid" id="playerDiceGrid"></div>
+          <div class="dice" id="diceDisplay">--</div>
+          <div class="actions">
+            <button id="rollBtn" disabled>주사위</button>
+            <button id="endTurnBtn" disabled>턴 종료</button>
+          </div>
+        </section>
+
+        <section class="panel build-panel">
+          <h2>건설</h2>
+          <div class="build-grid">
+            <button data-build="road" disabled>도로</button>
+            <button data-build="settlement" disabled>마을</button>
+            <button data-build="city" disabled>도시</button>
+            <button data-build="dev" disabled>발전</button>
+          </div>
+          <p id="buildHint">게임을 시작하세요.</p>
+        </section>
+
+        <section class="panel trade-panel">
+          <h2>은행 교환</h2>
+          <div class="trade-row">
+            <select id="giveResource"></select>
+            <span>→</span>
+            <select id="takeResource"></select>
+          </div>
+          <button id="bankTradeBtn" disabled>교환</button>
+          <p id="tradeRate">기본 4:1</p>
+        </section>
+
+        <section class="panel dev-panel">
+          <div class="panel-title-row">
+            <h2>발전 카드</h2>
+            <button id="devHelpBtn" class="mini-help-btn" aria-label="발전 카드 설명">?</button>
+          </div>
+          <div id="devCards"></div>
+        </section>
+      </aside>
+
+      <main class="game-shell">
+        <div class="topbar">
+          <div class="scoreboard" id="scoreboard"></div>
+          <div class="status" id="statusText">게임을 시작하면 보드가 생성됩니다.</div>
+        </div>
+        <div class="board-wrap">
+          <svg id="board" viewBox="0 0 920 760" role="img" aria-label="카탄 보드"></svg>
+        </div>
+      </main>
+
+      <aside class="logbar">
+        <section class="panel help-panel">
+          <h2>비용</h2>
+          <ul id="costList"></ul>
+        </section>
+        <section class="panel awards-panel">
+          <h2>특수 점수</h2>
+          <div id="awardCards" class="award-cards"></div>
+        </section>
+        <section class="panel resource-panel">
+          <h2>내 자원</h2>
+          <div id="resourceBar" class="resource-bar"></div>
+        </section>
+        <section class="panel log-panel">
+          <h2>게임 로그</h2>
+          <div id="log"></div>
+        </section>
+      </aside>
+    </div>
+
+    <div class="modal-backdrop" id="optionsModal" hidden>
+      <section class="modal" role="dialog" aria-modal="true" aria-labelledby="optionsTitle">
+        <div class="modal-head">
+          <h2 id="optionsTitle">옵션</h2>
+          <button id="closeOptionsBtn" class="icon-btn dark" aria-label="닫기">×</button>
+        </div>
+        <div class="color-options">
+          <label>
+            나
+            <input type="color" id="playerColor0" value="#2563a5" />
+          </label>
+          <label>
+            NPC A
+            <input type="color" id="playerColor1" value="#b94235" />
+          </label>
+          <label>
+            NPC B
+            <input type="color" id="playerColor2" value="#d97706" />
+          </label>
+          <label>
+            NPC C
+            <input type="color" id="playerColor3" value="#8e5bb8" />
+          </label>
+        </div>
+        <label class="speed-option">
+          NPC 최소 턴 시간
+          <div class="speed-row">
+            <input type="range" id="npcTurnDelay" min="500" max="3500" step="250" value="1500" />
+            <span id="npcTurnDelayValue">1.5초</span>
+          </div>
+        </label>
+        <label class="toggle-option">
+          <input type="checkbox" id="emojiToggle" checked />
+          자원 이모지 표시
+        </label>
+      </section>
+    </div>
+
+    <div class="modal-backdrop" id="newGameModal" hidden>
+      <section class="modal" role="dialog" aria-modal="true" aria-labelledby="newGameTitle">
+        <div class="modal-head">
+          <h2 id="newGameTitle">새 게임 설정</h2>
+          <button id="closeNewGameBtn" class="icon-btn dark" aria-label="닫기">×</button>
+        </div>
+        <label class="modal-field">
+          NPC 난이도
+          <select id="difficultySelect">
+            <option value="easy">쉬움</option>
+            <option value="normal" selected>보통</option>
+            <option value="hard">어려움</option>
+          </select>
+        </label>
+        <label class="modal-field">
+          목표 점수
+          <input type="number" id="targetScoreInput" min="5" max="20" value="10" />
+        </label>
+        <button id="newGameBtn" class="primary modal-start-btn">게임 시작</button>
+      </section>
+    </div>
+
+    <div class="modal-backdrop" id="discardModal" hidden>
+      <section class="modal" role="dialog" aria-modal="true" aria-labelledby="discardTitle">
+        <div class="modal-head">
+          <div>
+            <h2 id="discardTitle">자원 버리기</h2>
+            <p id="discardSummary" class="modal-subtitle"></p>
+          </div>
+        </div>
+        <div class="discard-list" id="discardList"></div>
+        <div class="discard-footer">
+          <span id="discardRemaining">0장 남음</span>
+          <button id="confirmDiscardBtn" class="primary" disabled>버리기</button>
+        </div>
+      </section>
+    </div>
+
+    <div class="modal-backdrop" id="devHelpModal" hidden>
+      <section class="modal" role="dialog" aria-modal="true" aria-labelledby="devHelpTitle">
+        <div class="modal-head">
+          <h2 id="devHelpTitle">발전 카드 설명</h2>
+          <button id="closeDevHelpBtn" class="icon-btn dark" aria-label="닫기">×</button>
+        </div>
+        <div class="dev-help-list">
+          <article>
+            <strong>기사</strong>
+            <p>도둑을 원하는 타일로 옮기고, 인접한 상대에게서 자원 1장을 빼앗습니다. 기사 3장 이상을 단독 최다로 사용하면 최대 기사력 2점을 얻습니다.</p>
+          </article>
+          <article>
+            <strong>승점</strong>
+            <p>숨겨진 1점 카드입니다. 사용하지 않고 보유만 해도 승점에 포함되며, 승리할 때 공개됩니다.</p>
+          </article>
+          <article>
+            <strong>도로 건설</strong>
+            <p>자원 비용 없이 도로 2개를 배치합니다.</p>
+          </article>
+          <article>
+            <strong>풍년</strong>
+            <p>원하는 자원 2장을 가져옵니다. 현재 구현에서는 밀 1장과 광석 1장을 받습니다.</p>
+          </article>
+          <article>
+            <strong>독점</strong>
+            <p>자원 한 종류를 선택하고 상대가 가진 그 자원을 모두 가져옵니다.</p>
+          </article>
+        </div>
+      </section>
+    </div>
+
+    <div class="modal-backdrop" id="monopolyModal" hidden>
+      <section class="modal" role="dialog" aria-modal="true" aria-labelledby="monopolyTitle">
+        <div class="modal-head">
+          <h2 id="monopolyTitle">독점 자원 선택</h2>
+        </div>
+        <p class="modal-subtitle">가져올 자원 한 종류를 선택하세요.</p>
+        <div class="monopoly-grid" id="monopolyChoices"></div>
+      </section>
+    </div>
+
+    <script src="game.js"></script>
+  </body>
+</html>
