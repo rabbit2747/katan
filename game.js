@@ -107,6 +107,7 @@ const els = {
   statusText: document.getElementById("statusText"),
   buildHint: document.getElementById("buildHint"),
   resourceBar: document.getElementById("resourceBar"),
+  bankResourceBar: document.getElementById("bankResourceBar"),
   costList: document.getElementById("costList"),
   log: document.getElementById("log"),
   giveResource: document.getElementById("giveResource"),
@@ -1643,6 +1644,12 @@ function renderResources() {
   const player = state.players[0];
   els.resourceBar.innerHTML = RESOURCES.map((res) => `
     <div class="resource-pill ${useEmoji() ? "emoji-mode" : "name-mode"}" title="${RESOURCE_LABEL[res]}"><span>${resourceText(res, useEmoji() ? "emoji" : "name")}</span>${player.resources[res]}</div>
+  `).join("");
+  els.bankResourceBar.innerHTML = RESOURCES.map((res) => `
+    <div class="bank-resource-item" title="${RESOURCE_LABEL[res]}">
+      <span>${resourceText(res, useEmoji() ? "emoji" : "name")}</span>
+      <strong>${state.bank[res]}</strong>
+    </div>
   `).join("");
 }
 

@@ -897,6 +897,46 @@ select {
   font-weight: 700;
 }
 
+.bank-resource-block {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.bank-resource-block h3 {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.bank-resource-bar {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 7px;
+}
+
+.bank-resource-item {
+  min-height: 42px;
+  border-radius: 8px;
+  background: #fffaf0;
+  border: 1px solid var(--line);
+  display: grid;
+  place-items: center;
+  padding: 5px 3px;
+}
+
+.bank-resource-item span {
+  font-size: 15px;
+  line-height: 1;
+}
+
+.bank-resource-item strong {
+  display: block;
+  margin-top: 2px;
+  color: var(--ink);
+  font-size: 13px;
+}
+
 .help-panel ul {
   margin: 0;
   padding-left: 18px;
