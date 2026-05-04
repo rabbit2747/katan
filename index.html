@@ -52,6 +52,7 @@
             <select id="takeResource"></select>
           </div>
           <button id="bankTradeBtn" disabled>교환</button>
+          <button id="playerTradeBtn" class="secondary-action" disabled>플레이어 교환</button>
           <p id="tradeRate">기본 4:1</p>
         </section>
 
@@ -87,7 +88,7 @@
           <h2>내 자원</h2>
           <div id="resourceBar" class="resource-bar"></div>
           <div class="bank-resource-block">
-            <h3>남은 자원 카드</h3>
+            <h3>분배 가능한 자원 카드</h3>
             <div id="bankResourceBar" class="bank-resource-bar"></div>
           </div>
         </section>
@@ -212,6 +213,52 @@
         </div>
         <p class="modal-subtitle">가져올 자원 한 종류를 선택하세요.</p>
         <div class="monopoly-grid" id="monopolyChoices"></div>
+      </section>
+    </div>
+
+    <div class="modal-backdrop" id="robberVictimModal" hidden>
+      <section class="modal" role="dialog" aria-modal="true" aria-labelledby="robberVictimTitle">
+        <div class="modal-head">
+          <div>
+            <h2 id="robberVictimTitle">강탈 대상 선택</h2>
+            <p class="modal-subtitle">도둑이 놓인 타일에 인접한 참가자 중 한 명을 선택하세요.</p>
+          </div>
+        </div>
+        <div class="victim-grid" id="robberVictimChoices"></div>
+      </section>
+    </div>
+
+    <div class="modal-backdrop" id="playerTradeModal" hidden>
+      <section class="modal trade-modal" role="dialog" aria-modal="true" aria-labelledby="playerTradeTitle">
+        <div class="modal-head">
+          <div>
+            <h2 id="playerTradeTitle">플레이어 교환</h2>
+            <p class="modal-subtitle">상대에게 교환을 제안하고 수락 여부를 기다립니다.</p>
+          </div>
+          <button id="closePlayerTradeBtn" class="icon-btn dark" aria-label="닫기">×</button>
+        </div>
+        <label class="modal-field">
+          상대 플레이어
+          <select id="tradeOpponentSelect"></select>
+        </label>
+        <div class="player-trade-grid">
+          <div class="trade-card">
+            <strong>내가 줌</strong>
+            <div class="trade-input-row">
+              <select id="tradeGiveResource"></select>
+              <input type="number" id="tradeGiveAmount" min="1" value="1" />
+            </div>
+          </div>
+          <div class="trade-card">
+            <strong>내가 받음</strong>
+            <div class="trade-input-row">
+              <select id="tradeTakeResource"></select>
+              <input type="number" id="tradeTakeAmount" min="1" value="1" />
+            </div>
+          </div>
+        </div>
+        <p id="playerTradeStatus" class="trade-status"></p>
+        <button id="submitPlayerTradeBtn" class="primary modal-start-btn">제안 보내기</button>
       </section>
     </div>
 

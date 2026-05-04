@@ -1,6 +1,7 @@
 "use strict";
 
 const RESOURCES = ["wood", "brick", "sheep", "wheat", "ore"];
+const RESOURCE_BANK_SIZE = 19;
 const RESOURCE_LABEL = {
   wood: "목재",
   brick: "벽돌",
@@ -68,6 +69,7 @@ let state = null;
 let selectedBuild = null;
 let freeRoadsToPlace = 0;
 let robberContext = null;
+let robberVictimContext = null;
 let discardContext = null;
 let monopolyContext = null;
 
@@ -84,6 +86,8 @@ const els = {
   closeDevHelpBtn: document.getElementById("closeDevHelpBtn"),
   monopolyModal: document.getElementById("monopolyModal"),
   monopolyChoices: document.getElementById("monopolyChoices"),
+  robberVictimModal: document.getElementById("robberVictimModal"),
+  robberVictimChoices: document.getElementById("robberVictimChoices"),
   discardModal: document.getElementById("discardModal"),
   discardSummary: document.getElementById("discardSummary"),
   discardList: document.getElementById("discardList"),
@@ -113,6 +117,16 @@ const els = {
   giveResource: document.getElementById("giveResource"),
   takeResource: document.getElementById("takeResource"),
   bankTradeBtn: document.getElementById("bankTradeBtn"),
+  playerTradeBtn: document.getElementById("playerTradeBtn"),
+  playerTradeModal: document.getElementById("playerTradeModal"),
+  closePlayerTradeBtn: document.getElementById("closePlayerTradeBtn"),
+  tradeOpponentSelect: document.getElementById("tradeOpponentSelect"),
+  tradeGiveResource: document.getElementById("tradeGiveResource"),
+  tradeGiveAmount: document.getElementById("tradeGiveAmount"),
+  tradeTakeResource: document.getElementById("tradeTakeResource"),
+  tradeTakeAmount: document.getElementById("tradeTakeAmount"),
+  playerTradeStatus: document.getElementById("playerTradeStatus"),
+  submitPlayerTradeBtn: document.getElementById("submitPlayerTradeBtn"),
   tradeRate: document.getElementById("tradeRate"),
   devCards: document.getElementById("devCards"),
   awardCards: document.getElementById("awardCards"),
@@ -439,7 +453,7 @@ function newGame() {
     phase: "setupOrderRoll",
     dice: null,
     devDeck: shuffle(DEV_DECK_TEMPLATE),
-    bank: Object.fromEntries(RESOURCES.map((r) => [r, 19])),
+    bank: Object.fromEntries(RESOURCES.map((r) => [r, RESOURCE_BANK_SIZE])),
     longestRoadOwner: null,
     largestArmyOwner: null,
     targetScore,
@@ -457,6 +471,7 @@ function newGame() {
   selectedBuild = null;
   freeRoadsToPlace = 0;
   robberContext = null;
+  robberVictimContext = null;
   discardContext = null;
   monopolyContext = null;
   log("선 결정 주사위를 굴립니다. 각 참가자가 차례대로 굴립니다.");
@@ -780,7 +795,7 @@ function resolveRoll(total) {
     const requests = demand[res];
     const totalNeeded = requests.reduce((sum, item) => sum + item.amount, 0);
     if (totalNeeded === 0) return;
-    if (state.bank[res] >= totalNeeded || requests.length === 1) {
+    if (state.bank[res] >= totalNeeded) {
       requests.forEach((item) => {
         const gained = gainResource(item.playerId, res, item.amount);
         recordProductionGain(item.playerId, res, gained);
@@ -891,19 +906,29 @@ function moveRobber(playerId) {
   placeRobberOnHex(playerId, target.id);
 }
 
-function placeRobberOnHex(playerId, hexId) {
+function moveRobberMarker(hexId) {
   const target = getHex(hexId);
-  if (!target || target.robber) return false;
+  if (!target || target.robber) return null;
   state.board.hexes.forEach((h) => {
     h.robber = h.id === target.id;
   });
-  const victims = target.vertexIds
+  return target;
+}
+
+function getRobberVictims(target, playerId) {
+  const owners = target.vertexIds
     .map((id) => getVertex(id).building?.owner)
     .filter((owner) => owner !== undefined && owner !== playerId && resourceCount(getPlayer(owner)) > 0);
+  return [...new Set(owners)];
+}
+
+function placeRobberOnHex(playerId, hexId) {
+  const target = moveRobberMarker(hexId);
+  if (!target) return false;
+  const victims = getRobberVictims(target, playerId);
   if (victims.length) {
     const victimId = victims[Math.floor(Math.random() * victims.length)];
-    stealRandomResource(playerId, victimId);
-    log(`${getPlayer(playerId).name}이 도둑을 ${TERRAIN[target.terrain].label}에 놓고 ${getPlayer(victimId).name}에게서 자원을 빼앗았습니다.`);
+    stealFromRobberVictim(playerId, victimId, target);
   } else {
     log(`${getPlayer(playerId).name}이 도둑을 ${TERRAIN[target.terrain].label}에 놓았습니다.`);
   }
@@ -912,11 +937,59 @@ function placeRobberOnHex(playerId, hexId) {
 
 function onHexClick(hexId) {
   if (!state || state.gameOver || !getPlayer().isHuman || state.phase !== "robberMove") return;
-  if (!placeRobberOnHex(state.currentPlayer, hexId)) {
+  const target = moveRobberMarker(hexId);
+  if (!target) {
     flashStatus("도둑은 현재 있는 타일이 아닌 다른 타일로 옮겨야 합니다.");
     return;
   }
+  const victims = getRobberVictims(target, state.currentPlayer);
+  if (victims.length > 1) {
+    openRobberVictimModal(state.currentPlayer, target.id, victims);
+    return;
+  }
+  if (victims.length === 1) {
+    stealFromRobberVictim(state.currentPlayer, victims[0], target);
+  } else {
+    log(`${getPlayer(state.currentPlayer).name}이 도둑을 ${TERRAIN[target.terrain].label}에 놓았습니다.`);
+  }
+  finishHumanRobberMove();
+}
+
+function openRobberVictimModal(playerId, hexId, victims) {
+  robberVictimContext = { playerId, hexId, victims };
+  state.phase = "robberVictim";
+  selectedBuild = null;
+  const target = getHex(hexId);
+  els.robberVictimChoices.innerHTML = victims.map((victimId) => {
+    const player = getPlayer(victimId);
+    return `
+      <button data-robber-victim="${victimId}" style="--player-color:${player.color}">
+        <strong>${escapeHtml(player.name)}</strong>
+        <span>자원 ${resourceCount(player)}장</span>
+      </button>
+    `;
+  }).join("");
+  els.robberVictimChoices.querySelectorAll("[data-robber-victim]").forEach((btn) => {
+    btn.addEventListener("click", () => chooseRobberVictim(Number(btn.dataset.robberVictim)));
+  });
+  log(`${getPlayer(playerId).name}이 도둑을 ${TERRAIN[target.terrain].label}에 놓았습니다. 강탈 대상을 선택하세요.`);
+  els.robberVictimModal.hidden = false;
+  render();
+}
+
+function chooseRobberVictim(victimId) {
+  if (!robberVictimContext || !robberVictimContext.victims.includes(victimId)) return;
+  const target = getHex(robberVictimContext.hexId);
+  stealFromRobberVictim(robberVictimContext.playerId, victimId, target);
+  els.robberVictimModal.hidden = true;
+  robberVictimContext = null;
+  finishHumanRobberMove();
+}
+
+function finishHumanRobberMove() {
   robberContext = null;
+  robberVictimContext = null;
+  els.robberVictimModal.hidden = true;
   state.phase = "build";
   render();
 }
@@ -941,11 +1014,21 @@ function robberHexScore(hex, playerId, leaderId) {
 function stealRandomResource(thiefId, victimId) {
   const victim = getPlayer(victimId);
   const pool = RESOURCES.flatMap((res) => Array(victim.resources[res]).fill(res));
-  if (!pool.length) return false;
+  if (!pool.length) return null;
   const res = pool[Math.floor(Math.random() * pool.length)];
   victim.resources[res] -= 1;
   getPlayer(thiefId).resources[res] += 1;
-  return true;
+  return res;
+}
+
+function stealFromRobberVictim(thiefId, victimId, target) {
+  const stolen = stealRandomResource(thiefId, victimId);
+  if (stolen) {
+    log(`${getPlayer(thiefId).name}이 도둑을 ${TERRAIN[target.terrain].label}에 놓고 ${getPlayer(victimId).name}에게서 ${RESOURCE_LABEL[stolen]} 1장을 빼앗았습니다.`);
+  } else {
+    log(`${getPlayer(thiefId).name}이 도둑을 ${TERRAIN[target.terrain].label}에 놓았습니다.`);
+  }
+  return stolen;
 }
 
 function endHumanTurn() {
@@ -1177,6 +1260,140 @@ function performBankTrade() {
   render();
 }
 
+function openPlayerTradeModal() {
+  if (!state || state.gameOver || state.currentPlayer !== 0 || state.phase !== "build") return;
+  const opponentValue = els.tradeOpponentSelect.value || "1";
+  els.tradeOpponentSelect.innerHTML = state.players
+    .filter((player) => !player.isHuman)
+    .map((player) => `<option value="${player.id}">${escapeHtml(player.name)} · 자원 ${resourceCount(player)}장</option>`)
+    .join("");
+  els.tradeOpponentSelect.value = state.players[Number(opponentValue)]?.isHuman ? "1" : opponentValue;
+  fillResourceSelect(els.tradeGiveResource, els.tradeGiveResource.value || richestResource(state.players[0]) || "wood");
+  fillResourceSelect(els.tradeTakeResource, els.tradeTakeResource.value || richestResource(getPlayer(Number(els.tradeOpponentSelect.value))) || "brick");
+  els.tradeGiveAmount.value = Math.max(1, Number(els.tradeGiveAmount.value || 1));
+  els.tradeTakeAmount.value = Math.max(1, Number(els.tradeTakeAmount.value || 1));
+  els.playerTradeStatus.textContent = "";
+  els.playerTradeModal.hidden = false;
+  updatePlayerTradeModal();
+}
+
+function closePlayerTradeModal() {
+  els.playerTradeModal.hidden = true;
+}
+
+function fillResourceSelect(select, value) {
+  select.innerHTML = RESOURCES.map((res) => `<option value="${res}">${resourceText(res, "compact")}</option>`).join("");
+  select.value = RESOURCES.includes(value) ? value : RESOURCES[0];
+}
+
+function richestResource(player) {
+  return RESOURCES.slice().sort((a, b) => player.resources[b] - player.resources[a])[0];
+}
+
+function readPlayerTradeOffer() {
+  return {
+    opponentId: Number(els.tradeOpponentSelect.value),
+    giveResource: els.tradeGiveResource.value,
+    giveAmount: Math.max(1, Number(els.tradeGiveAmount.value || 1)),
+    takeResource: els.tradeTakeResource.value,
+    takeAmount: Math.max(1, Number(els.tradeTakeAmount.value || 1)),
+  };
+}
+
+function validatePlayerTradeOffer(offer = readPlayerTradeOffer()) {
+  if (!state || state.gameOver || state.currentPlayer !== 0 || state.phase !== "build") return "내 차례의 건설 단계에서만 교환할 수 있습니다.";
+  const human = state.players[0];
+  const opponent = state.players[offer.opponentId];
+  if (!opponent || opponent.isHuman) return "교환할 상대를 선택하세요.";
+  if (offer.giveResource === offer.takeResource) return "같은 자원끼리는 교환할 필요가 없습니다.";
+  if (human.resources[offer.giveResource] < offer.giveAmount) return `내 ${resourceText(offer.giveResource, "name")}가 부족합니다.`;
+  if (opponent.resources[offer.takeResource] < offer.takeAmount) return `${opponent.name}의 ${resourceText(offer.takeResource, "name")}가 부족합니다.`;
+  return "";
+}
+
+function updatePlayerTradeModal() {
+  if (els.playerTradeModal.hidden) return;
+  fillResourceSelect(els.tradeGiveResource, els.tradeGiveResource.value || "wood");
+  fillResourceSelect(els.tradeTakeResource, els.tradeTakeResource.value || "brick");
+  const offer = readPlayerTradeOffer();
+  const human = state.players[0];
+  const opponent = state.players[offer.opponentId];
+  els.tradeGiveAmount.max = Math.max(1, human.resources[offer.giveResource] || 0);
+  els.tradeTakeAmount.max = Math.max(1, opponent?.resources[offer.takeResource] || 0);
+  const error = validatePlayerTradeOffer(offer);
+  els.submitPlayerTradeBtn.disabled = Boolean(error);
+  els.playerTradeStatus.textContent = error || `${opponent.name}에게 제안할 수 있습니다.`;
+}
+
+function submitPlayerTradeOffer() {
+  const offer = readPlayerTradeOffer();
+  const error = validatePlayerTradeOffer(offer);
+  if (error) {
+    els.playerTradeStatus.textContent = error;
+    return;
+  }
+  const opponent = getPlayer(offer.opponentId);
+  els.submitPlayerTradeBtn.disabled = true;
+  els.playerTradeStatus.textContent = `${opponent.name}가 제안을 검토하고 있습니다...`;
+  setTimeout(() => {
+    if (!state || state.gameOver || state.currentPlayer !== 0 || state.phase !== "build") return;
+    const currentError = validatePlayerTradeOffer(offer);
+    if (currentError) {
+      els.playerTradeStatus.textContent = currentError;
+      els.submitPlayerTradeBtn.disabled = true;
+      return;
+    }
+    if (evaluateNpcTrade(0, offer.opponentId, offer)) {
+      applyPlayerTrade(0, offer.opponentId, offer);
+      els.playerTradeStatus.textContent = `${opponent.name}가 교환을 수락했습니다.`;
+      closePlayerTradeModal();
+      render();
+    } else {
+      els.playerTradeStatus.textContent = `${opponent.name}가 교환을 거절했습니다.`;
+      els.submitPlayerTradeBtn.disabled = false;
+    }
+  }, Math.max(700, Math.min(1800, getNpcTurnDelay())));
+}
+
+function evaluateNpcTrade(humanId, npcId, offer) {
+  const npc = getPlayer(npcId);
+  const human = getPlayer(humanId);
+  const gainValue = resourceNeedScore(npcId, offer.giveResource) * offer.giveAmount;
+  const lossValue = resourceNeedScore(npcId, offer.takeResource) * offer.takeAmount;
+  const cardBalance = offer.giveAmount - offer.takeAmount;
+  let score = gainValue - lossValue + cardBalance * 0.55;
+  if (victoryPoints(human, true) >= (state.targetScore || 10) - 2) score -= npc.difficulty === "hard" ? 2.4 : 1.2;
+  const threshold = { easy: -1.25, normal: 0.15, hard: 1.05 }[npc.difficulty] ?? 0.15;
+  return score >= threshold;
+}
+
+function resourceNeedScore(playerId, res) {
+  const player = getPlayer(playerId);
+  let score = 1;
+  if (player.resources[res] === 0) score += 0.9;
+  if (player.settlements > 0 && COSTS.city[res]) score += 1.6;
+  if (COSTS.settlement[res]) score += 1.2;
+  if (COSTS.road[res] && state.board.edges.some((edge) => canBuildRoad(playerId, edge.id, true))) score += 0.9;
+  if (state.devDeck.length && COSTS.dev[res]) score += 0.8;
+  const nearCosts = [COSTS.city, COSTS.settlement, COSTS.road, COSTS.dev];
+  nearCosts.forEach((cost) => {
+    if (!cost[res]) return;
+    const missing = Object.entries(cost).reduce((sum, [r, amount]) => sum + Math.max(0, amount - player.resources[r]), 0);
+    if (missing <= cost[res] + 1) score += 1.1;
+  });
+  return score;
+}
+
+function applyPlayerTrade(humanId, npcId, offer) {
+  const human = getPlayer(humanId);
+  const npc = getPlayer(npcId);
+  human.resources[offer.giveResource] -= offer.giveAmount;
+  npc.resources[offer.giveResource] += offer.giveAmount;
+  npc.resources[offer.takeResource] -= offer.takeAmount;
+  human.resources[offer.takeResource] += offer.takeAmount;
+  log(`${npc.name}가 교환을 수락했습니다: ${resourceText(offer.giveResource, "name")} ${offer.giveAmount}장을 주고 ${resourceText(offer.takeResource, "name")} ${offer.takeAmount}장을 받았습니다.`);
+}
+
 function tradeRateFor(playerId, resource) {
   let rate = 4;
   state.board.ports.forEach((port) => {
@@ -1264,6 +1481,12 @@ function checkWin() {
 
 function resourceCount(player) {
   return RESOURCES.reduce((sum, res) => sum + player.resources[res], 0);
+}
+
+function remainingResourceCards(res) {
+  if (!state) return RESOURCE_BANK_SIZE;
+  const held = state.players.reduce((sum, player) => sum + player.resources[res], 0);
+  return Math.max(0, RESOURCE_BANK_SIZE - held);
 }
 
 function log(message) {
@@ -1447,6 +1670,8 @@ function renderPanels() {
   });
   els.bankTradeBtn.disabled = !state || state.gameOver || !player?.isHuman || state.phase !== "build";
   els.bankTradeBtn.classList.toggle("available", selectedTradeAvailable);
+  els.playerTradeBtn.disabled = !state || state.gameOver || !player?.isHuman || state.phase !== "build";
+  els.playerTradeBtn.classList.toggle("available", Boolean(available.playerTrade));
   els.statusText.textContent = statusText();
   els.buildHint.textContent = selectedBuild ? els.buildHint.textContent : "건설 종류를 고른 뒤 보드에서 위치를 클릭하세요.";
   if (state && !state.setupDone) {
@@ -1464,6 +1689,9 @@ function renderPanels() {
   if (state?.phase === "robberMove") {
     els.buildHint.textContent = "도둑을 옮길 타일을 클릭하세요.";
   }
+  if (state?.phase === "robberVictim") {
+    els.buildHint.textContent = "도둑에게 강탈당할 상대를 선택하세요.";
+  }
   renderTurnTracker();
   renderScoreboard();
   renderResources();
@@ -1475,16 +1703,18 @@ function renderPanels() {
 
 function getHumanAvailableActions() {
   if (!state || state.gameOver || state.currentPlayer !== 0 || state.phase !== "build") {
-    return { road: false, settlement: false, city: false, dev: false, bankTrade: false };
+    return { road: false, settlement: false, city: false, dev: false, bankTrade: false, playerTrade: false };
   }
   const playerId = 0;
   const player = state.players[0];
+  const hasTradePartner = state.players.some((p) => !p.isHuman && RESOURCES.some((res) => p.resources[res] > 0));
   return {
     road: hasResources(player, COSTS.road) && state.board.edges.some((edge) => canBuildRoad(playerId, edge.id)),
     settlement: hasResources(player, COSTS.settlement) && state.board.vertices.some((vertex) => canBuildSettlement(playerId, vertex.id)),
     city: hasResources(player, COSTS.city) && state.board.vertices.some((vertex) => canBuildCity(playerId, vertex.id)),
     dev: state.devDeck.length > 0 && hasResources(player, COSTS.dev),
     bankTrade: RESOURCES.some((res) => player.resources[res] >= tradeRateFor(playerId, res)) && RESOURCES.some((res) => state.bank[res] > 0),
+    playerTrade: RESOURCES.some((res) => player.resources[res] > 0) && hasTradePartner,
   };
 }
 
@@ -1540,6 +1770,7 @@ function phaseLabel() {
   if (state.phase === "setupRoad") return "초기 도로";
   if (state.phase === "discard") return "자원 버림";
   if (state.phase === "robberMove") return "도둑 이동";
+  if (state.phase === "robberVictim") return "강탈 선택";
   if (state.phase === "roll") return "주사위";
   if (state.phase === "build") return "건설";
   return "설정";
@@ -1567,6 +1798,9 @@ function statusText() {
   }
   if (state.phase === "robberMove") {
     return "도둑을 현재 위치가 아닌 다른 타일로 옮기세요. 인접한 상대가 자원을 갖고 있으면 무작위로 1장을 빼앗습니다.";
+  }
+  if (state.phase === "robberVictim") {
+    return "도둑이 놓인 타일에 인접한 상대 중 강탈할 참가자를 선택하세요.";
   }
   if (getPlayer().isHuman) {
     return state.phase === "roll" ? "주사위를 굴려 생산을 시작하세요." : "건설, 교환, 발전 카드 구매를 하고 턴을 종료하세요.";
@@ -1646,9 +1880,9 @@ function renderResources() {
     <div class="resource-pill ${useEmoji() ? "emoji-mode" : "name-mode"}" title="${RESOURCE_LABEL[res]}"><span>${resourceText(res, useEmoji() ? "emoji" : "name")}</span>${player.resources[res]}</div>
   `).join("");
   els.bankResourceBar.innerHTML = RESOURCES.map((res) => `
-    <div class="bank-resource-item" title="${RESOURCE_LABEL[res]}">
+    <div class="bank-resource-item ${remainingResourceCards(res) === 0 ? "empty" : ""}" title="${RESOURCE_LABEL[res]} 분배 가능 ${remainingResourceCards(res)}장">
       <span>${resourceText(res, useEmoji() ? "emoji" : "name")}</span>
-      <strong>${state.bank[res]}</strong>
+      <strong>${remainingResourceCards(res)}</strong>
     </div>
   `).join("");
 }
@@ -1663,6 +1897,7 @@ function renderTrades() {
   els.takeResource.value = takeValue;
   const give = els.giveResource.value || "wood";
   els.tradeRate.textContent = `현재 ${resourceText(give, useEmoji() ? "emoji" : "name")} ${tradeRateFor(0, give)}:1`;
+  if (!els.playerTradeModal.hidden) updatePlayerTradeModal();
 }
 
 function renderDevCards() {
@@ -1751,6 +1986,7 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && !els.newGameModal.hidden) closeNewGameModal();
   if (event.key === "Escape" && !els.optionsModal.hidden) closeOptionsModal();
   if (event.key === "Escape" && !els.devHelpModal.hidden) closeDevHelpModal();
+  if (event.key === "Escape" && !els.playerTradeModal.hidden) closePlayerTradeModal();
 });
 els.confirmDiscardBtn.addEventListener("click", confirmDiscard);
 els.playerColorInputs.forEach((input) => {
@@ -1765,6 +2001,17 @@ els.rollBtn.addEventListener("click", rollDice);
 els.endTurnBtn.addEventListener("click", endHumanTurn);
 els.bankTradeBtn.addEventListener("click", performBankTrade);
 els.giveResource.addEventListener("change", renderTrades);
+els.takeResource.addEventListener("change", renderTrades);
+els.playerTradeBtn.addEventListener("click", openPlayerTradeModal);
+els.closePlayerTradeBtn.addEventListener("click", closePlayerTradeModal);
+els.playerTradeModal.addEventListener("click", (event) => {
+  if (event.target === els.playerTradeModal) closePlayerTradeModal();
+});
+[els.tradeOpponentSelect, els.tradeGiveResource, els.tradeGiveAmount, els.tradeTakeResource, els.tradeTakeAmount]
+  .forEach((input) => input.addEventListener("input", updatePlayerTradeModal));
+[els.tradeOpponentSelect, els.tradeGiveResource, els.tradeTakeResource]
+  .forEach((input) => input.addEventListener("change", updatePlayerTradeModal));
+els.submitPlayerTradeBtn.addEventListener("click", submitPlayerTradeOffer);
 document.querySelectorAll("[data-build]").forEach((btn) => {
   btn.addEventListener("click", () => humanBuild(btn.dataset.build));
 });

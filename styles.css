@@ -55,6 +55,12 @@ button.primary {
   font-weight: 700;
 }
 
+button.secondary-action {
+  width: 100%;
+  margin-top: 8px;
+  font-weight: 800;
+}
+
 button.available:not(:disabled) {
   border-color: #b95738;
   background: #ffd95a;
@@ -325,6 +331,55 @@ select {
   font: inherit;
 }
 
+.trade-modal {
+  width: min(460px, 100%);
+}
+
+.player-trade-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.trade-card {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffaf0;
+}
+
+.trade-card strong {
+  font-size: 13px;
+}
+
+.trade-input-row {
+  display: grid;
+  grid-template-columns: 1fr 64px;
+  gap: 8px;
+}
+
+.trade-input-row input {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid #b9ae98;
+  border-radius: 6px;
+  background: #fffaf0;
+  color: var(--ink);
+  padding: 0 8px;
+  font: inherit;
+}
+
+.trade-status {
+  min-height: 19px;
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
 .modal-start-btn {
   width: 100%;
   margin-top: 14px;
@@ -419,6 +474,31 @@ select {
 .monopoly-grid button {
   min-height: 54px;
   font-weight: 900;
+}
+
+.victim-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.victim-grid button {
+  min-height: 58px;
+  display: grid;
+  justify-items: start;
+  gap: 3px;
+  border-left: 8px solid var(--player-color);
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.victim-grid strong {
+  font-size: 14px;
+}
+
+.victim-grid span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .turn-topline {
@@ -937,6 +1017,15 @@ select {
   font-size: 13px;
 }
 
+.bank-resource-item.empty {
+  border-color: var(--danger);
+  background: #f7ddd5;
+}
+
+.bank-resource-item.empty strong {
+  color: var(--danger);
+}
+
 .help-panel ul {
   margin: 0;
   padding-left: 18px;
@@ -1000,6 +1089,10 @@ select {
 
   .scoreboard {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .player-trade-grid {
+    grid-template-columns: 1fr;
   }
 
   .board-wrap,
